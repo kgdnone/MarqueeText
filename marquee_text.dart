@@ -1,7 +1,6 @@
+import 'package:dengai/generated/assets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-
-import '../../generated/assets.dart';
 
 class MarqueeText extends StatefulWidget {
   final String text;
@@ -27,6 +26,7 @@ class _MarqueeTextState extends State<MarqueeText>
   double _containerWidth = 0;
   double _textWidth = 0;
   bool _needsScroll = false;
+  final GlobalKey _mq = GlobalKey();
 
   @override
   void initState() {
@@ -66,7 +66,8 @@ class _MarqueeTextState extends State<MarqueeText>
     _needsScroll = _textWidth > _containerWidth;
 
     if (_needsScroll) {
-      final totalDistance = _textWidth + _containerWidth;
+      // 计算滚动距离：文本宽度
+      final totalDistance = _textWidth;
       final durationSeconds = totalDistance / widget.scrollVelocity;
       _controller.duration = Duration(seconds: durationSeconds.toInt());
       if (!_controller.isAnimating) _controller.forward();
@@ -97,61 +98,68 @@ class _MarqueeTextState extends State<MarqueeText>
             width: 8.w,
           ),
           Expanded(
-              child: ShaderMask(
-                  shaderCallback: (bounds) {
-                    return const LinearGradient(
-                      colors: [Colors.transparent, Colors.white],
-                      stops: [0.0, 0.1], // 调整渐变的范围
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ).createShader(bounds);
-                  },
-                  blendMode: BlendMode.dstIn,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final textStyle =
-                          widget.style ?? DefaultTextStyle.of(context).style;
-                      final textPainter = TextPainter(
-                        text: TextSpan(text: widget.text, style: textStyle),
-                        textDirection: TextDirection.ltr,
-                        maxLines: 1,
-                      )..layout();
+            child: ShaderMask(
+              shaderCallback: (bounds) {
+                return const LinearGradient(
+                  colors: [Colors.transparent, Colors.white],
+                  stops: [0.0, 0.1], // 调整渐变的范围
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ).createShader(bounds);
+              },
+              blendMode: BlendMode.dstIn,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final textStyle =
+                      widget.style ?? DefaultTextStyle.of(context).style;
+                  final textPainter = TextPainter(
+                    text: TextSpan(text: widget.text, style: textStyle),
+                    textDirection: TextDirection.ltr,
+                    maxLines: 1,
+                  )..layout();
 
-                      return SizedBox(
-                          width: constraints.maxWidth,
-                          child: ClipRect(
-                              child: Stack(
-                            clipBehavior: Clip.hardEdge,
-                            children: [
-                              if (textPainter.width > constraints.maxWidth)
-                                AnimatedBuilder(
-                                  animation: _controller,
-                                  builder: (context, child) {
-                                    return Transform.translate(
-                                      offset: Offset(
-                                        -_controller.value * _textWidth,
-                                        0,
-                                      ),
-                                      child: child,
-                                    );
-                                  },
-                                  child: Text(
-                                    widget.text,
-                                    style: textStyle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.visible,
+                  return SizedBox(
+                    key: _mq,
+                    width: constraints.maxWidth,
+                    child: ClipRect(
+                      child: Stack(
+                        clipBehavior: Clip.hardEdge,
+                        children: [
+                          if (textPainter.width > constraints.maxWidth)
+                            AnimatedBuilder(
+                              animation: _controller,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(
+                                    // 从组件右侧进入，滚动到完全离开组件左侧
+                                    _containerWidth -
+                                        _controller.value * _textWidth,
+                                    0,
                                   ),
-                                )
-                              else
-                                Text(
-                                  widget.text,
-                                  style: textStyle,
-                                  maxLines: 1,
-                                ),
-                            ],
-                          )));
-                    },
-                  )))
+                                  child: child,
+                                );
+                              },
+                              child: Text(
+                                widget.text,
+                                style: textStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.visible,
+                              ),
+                            )
+                          else
+                            Text(
+                              widget.text,
+                              style: textStyle,
+                              maxLines: 1,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -170,7 +178,7 @@ class _MarqueeTextState extends State<MarqueeText>
 
       setState(() {
         _textWidth = textPainter.width;
-        _containerWidth = context.size?.width ?? 0;
+        _containerWidth = _mq.currentContext?.size?.width ?? 0;
         _initAnimation();
       });
     });
